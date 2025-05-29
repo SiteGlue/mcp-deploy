@@ -122,6 +122,10 @@ class JuvonnoMCPServer {
     try {
       console.log(`Finding location for postal code: ${postalCode}`);
       
+      // Clean and normalize postal code for voice input (remove spaces, convert to uppercase)
+      const cleanedPostalCode = postalCode.replace(/\s+/g, '').toUpperCase();
+      console.log(`Cleaned postal code: ${cleanedPostalCode}`);
+      
       // Get branches from the API
       const branches = await this.executeApiCall('/branches', 'GET');
       
@@ -129,8 +133,8 @@ class JuvonnoMCPServer {
       const locationList = branches.list || branches.data || [];
       
       if (locationList && locationList.length > 0) {
-        // Try to find locations matching the postal code area
-        const postalPrefix = postalCode.substring(0, 3).toUpperCase();
+        // Try to find locations matching the postal code area using cleaned postal code
+        const postalPrefix = cleanedPostalCode.substring(0, 3);
         
         // Find exact match first
         let exactMatch = locationList.find(loc => 
@@ -162,7 +166,7 @@ class JuvonnoMCPServer {
         return {
           status: 'success',
           location_found: true,
-          message: `Found ${formattedLocations.length} clinic locations near postal code ${postalCode}`,
+          message: `Found ${formattedLocations.length} clinic locations near postal code ${cleanedPostalCode}`,
           locations: formattedLocations,
           count: formattedLocations.length,
           // Also include primary location for backward compatibility
