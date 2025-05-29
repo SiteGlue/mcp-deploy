@@ -372,6 +372,61 @@ app.post('/find-location', async (req, res) => {
   }
 });
 
+// MCP endpoint for Vapi compatibility
+app.post('/mcp/call', async (req, res) => {
+  try {
+    const { method, params } = req.body;
+    
+    if (method === 'tools/call') {
+      const { name, arguments: args } = params;
+      console.log(`Vapi MCP call: ${name}`, args);
+      
+      const result = await mcpServer.handleToolCall(name, args || {});
+      
+      res.json({
+        jsonrpc: "2.0",
+        id: req.body.id || 1,
+        result: {
+          content: [
+            {
+              type: "text", 
+              text: JSON.stringify(result)
+            }
+          ]
+        }
+      });
+    } else if (method === 'tools/list') {
+      const tools = mcpServer.generateTools();
+      res.json({
+        jsonrpc: "2.0",
+        id: req.body.id || 1,
+        result: {
+          tools: tools
+        }
+      });
+    } else {
+      res.status(400).json({
+        jsonrpc: "2.0",
+        id: req.body.id || 1,
+        error: {
+          code: -32601,
+          message: `Unknown method: ${method}`
+        }
+      });
+    }
+  } catch (error) {
+    console.error('Vapi MCP call error:', error);
+    res.status(500).json({
+      jsonrpc: "2.0", 
+      id: req.body.id || 1,
+      error: {
+        code: -32603,
+        message: error.message
+      }
+    });
+  }
+});
+
 // Test Juvonno API connectivity
 app.get('/test-api', async (req, res) => {
   try {
