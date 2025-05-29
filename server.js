@@ -129,27 +129,48 @@ class JuvonnoMCPServer {
       const locationList = branches.list || branches.data || [];
       
       if (locationList && locationList.length > 0) {
-        // Find the closest location by postal code or return the first one
-        let location = locationList[0];
-        
-        // Try to find a location matching the postal code area
+        // Try to find locations matching the postal code area
         const postalPrefix = postalCode.substring(0, 3).toUpperCase();
-        const matchingLocation = locationList.find(loc => 
+        
+        // Find exact match first
+        let exactMatch = locationList.find(loc => 
           loc.postal && loc.postal.substring(0, 3).toUpperCase() === postalPrefix
         );
         
-        if (matchingLocation) {
-          location = matchingLocation;
+        // Get up to 3 locations - prioritize exact match, then all others
+        let nearbyLocations = [];
+        if (exactMatch) {
+          nearbyLocations.push(exactMatch);
+          // Add other locations that aren't the exact match
+          const others = locationList.filter(loc => loc.id !== exactMatch.id).slice(0, 2);
+          nearbyLocations = nearbyLocations.concat(others);
+        } else {
+          // No exact match, return first 3 locations
+          nearbyLocations = locationList.slice(0, 3);
         }
+        
+        // Format locations for the response
+        const formattedLocations = nearbyLocations.map(loc => ({
+          name: loc.name,
+          address: loc.address,
+          city: loc.city,
+          postal_code: loc.postal,
+          phone: loc.phone,
+          services: ['Massage Therapy', 'Physiotherapy', 'Chiropractic Care']
+        }));
+        
         return {
           status: 'success',
           location_found: true,
-          message: `Found clinic location for postal code ${postalCode}`,
-          clinic_name: location.name || 'MedRehab Group Pickering',
-          address: location.address || '1105 Kingston Rd #11, Pickering, Ontario',
-          phone: location.phone || '(905) 837-5000',
-          postal_code: location.postal_code || 'L1V 1B5',
-          services: ['Massage Therapy', 'Physiotherapy', 'Chiropractic Care'],
+          message: `Found ${formattedLocations.length} clinic locations near postal code ${postalCode}`,
+          locations: formattedLocations,
+          count: formattedLocations.length,
+          // Also include primary location for backward compatibility
+          clinic_name: formattedLocations[0].name,
+          address: formattedLocations[0].address,
+          phone: formattedLocations[0].phone,
+          postal_code: formattedLocations[0].postal_code,
+          services: formattedLocations[0].services,
           booking_available: true
         };
       } else {
