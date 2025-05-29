@@ -125,8 +125,22 @@ class JuvonnoMCPServer {
       // Get branches from the API
       const branches = await this.executeApiCall('/branches', 'GET');
       
-      if (branches && branches.data && branches.data.length > 0) {
-        const location = branches.data[0];
+      // The API returns data in branches.list format
+      const locationList = branches.list || branches.data || [];
+      
+      if (locationList && locationList.length > 0) {
+        // Find the closest location by postal code or return the first one
+        let location = locationList[0];
+        
+        // Try to find a location matching the postal code area
+        const postalPrefix = postalCode.substring(0, 3).toUpperCase();
+        const matchingLocation = locationList.find(loc => 
+          loc.postal && loc.postal.substring(0, 3).toUpperCase() === postalPrefix
+        );
+        
+        if (matchingLocation) {
+          location = matchingLocation;
+        }
         return {
           status: 'success',
           location_found: true,
