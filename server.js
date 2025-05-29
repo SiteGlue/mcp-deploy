@@ -136,10 +136,25 @@ class JuvonnoMCPServer {
         // Try to find locations matching the postal code area using cleaned postal code
         const postalPrefix = cleanedPostalCode.substring(0, 3);
         
-        // Find exact match first
-        let exactMatch = locationList.find(loc => 
-          loc.postal && loc.postal.substring(0, 3).toUpperCase() === postalPrefix
-        );
+        // Find exact match first - try full postal code, then prefix matching
+        let exactMatch = locationList.find(loc => {
+          if (!loc.postal) return false;
+          const cleanedLocationPostal = loc.postal.replace(/\s+/g, '').toUpperCase();
+          
+          // Try exact match first
+          if (cleanedLocationPostal === cleanedPostalCode) return true;
+          
+          // Try prefix matching (first 3 characters)
+          if (cleanedLocationPostal.substring(0, 3) === postalPrefix) return true;
+          
+          // Try partial matching for voice input (location postal starts with provided code)
+          if (cleanedLocationPostal.startsWith(cleanedPostalCode)) return true;
+          
+          // Try reverse - provided code starts with location postal (for partial voice input)
+          if (cleanedPostalCode.startsWith(cleanedLocationPostal.substring(0, Math.min(cleanedLocationPostal.length, cleanedPostalCode.length)))) return true;
+          
+          return false;
+        });
         
         // Get up to 3 locations - prioritize exact match, then all others
         let nearbyLocations = [];
