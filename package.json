@@ -1,0 +1,21 @@
+{
+  "name": "juvonno-mcp-server",
+  "version": "2.0.0",
+  "type": "module",
+  "description": "Model Context Protocol server for Juvonno API with automatic Swagger/OpenAPI tool generation",
+  "main": "swagger_mcp_server.js",
+  "scripts": {
+    "start": "node swagger_mcp_server.js",
+    "web": "node heroku_web_server.js"
+  },
+  "engines": {
+    "node": "20.x"
+  },
+  "keywords": ["mcp", "juvonno", "api", "healthcare", "appointments"],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^4.18.2"
+  }
+}
