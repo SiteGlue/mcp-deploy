@@ -52,6 +52,15 @@ class JuvonnoMCPServer {
           properties: {},
           required: []
         }
+      },
+      {
+        name: 'getAllLocations',
+        description: 'Get all MedRehab Group clinic locations and addresses when asked "What are your locations?"',
+        inputSchema: {
+          type: 'object',
+          properties: {},
+          required: []
+        }
       }
     ];
   }
@@ -223,6 +232,33 @@ class JuvonnoMCPServer {
         case 'getProviders':
           const providers = await this.executeApiCall('/providers', 'GET');
           return providers;
+          
+        case 'getAllLocations':
+          const allBranches = await this.executeApiCall('/branches', 'GET');
+          const locationList = allBranches.list || allBranches.data || [];
+          
+          if (locationList && locationList.length > 0) {
+            const formattedLocations = locationList.map(loc => ({
+              name: loc.name,
+              address: loc.address,
+              city: loc.city,
+              postal_code: loc.postal,
+              phone: loc.phone,
+              services: ['Massage Therapy', 'Physiotherapy', 'Chiropractic Care']
+            }));
+            
+            return {
+              status: 'success',
+              message: `We have ${formattedLocations.length} MedRehab Group locations`,
+              locations: formattedLocations,
+              count: formattedLocations.length
+            };
+          } else {
+            return {
+              status: 'error',
+              message: 'No locations available'
+            };
+          }
           
         default:
           throw new Error(`Unknown tool: ${toolName}`);
