@@ -1,0 +1,1 @@
+web: node heroku-mcp-server.js

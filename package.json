@@ -1,19 +1,17 @@
 {
-  "name": "juvonno-mcp-server",
-  "version": "2.0.0",
-  "description": "Model Context Protocol server for Juvonno API with automatic Swagger/OpenAPI tool generation",
-  "main": "server.js",
+  "name": "medrehab-mcp-server",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "MCP Server for MedRehab Group clinic locations with authentic Juvonno data",
+  "main": "heroku-mcp-server.js",
   "scripts": {
-    "start": "node server.js",
-    "web": "node server.js"
+    "start": "node heroku-mcp-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^4.18.2"
   },
   "engines": {
-    "node": "20.x"
-  },
-  "keywords": ["mcp", "juvonno", "api", "healthcare", "appointments"],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "express": "^4.18.2"
+    "node": ">=18.0.0"
   }
 }
