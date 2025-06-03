@@ -3,9 +3,9 @@
   "version": "2.0.0",
 
   "description": "MCP Server for MedRehab Group clinic locations with authentic Juvonno data",
-  "main": "vapi-server-no-auth.js",
+  "main": "vapi-server-content-field.js",
   "scripts": {
-    "start": "node vapi-server-no-auth.js"
+    "start": "node vapi-server-content-field.js"
   },
   "dependencies": {
     "express": "^4.18.2",

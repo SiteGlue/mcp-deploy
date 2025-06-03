@@ -1,1 +1,1 @@
-web: node vapi-server-no-auth.js
+web: node vapi-server-content-field.js
