@@ -401,18 +401,28 @@ app.post('/vapi/tools/call', async (req, res) => {
 app.post('/get-locations', async (req, res) => {
   try {
     console.log('Function: Get locations request received');
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
+    // Check authentication
+    const authHeader = req.headers.authorization;
+    if (!authHeader || authHeader !== 'Bearer 9e4ce8c2-e125-4657-bb2b-4ac9c82dc123') {
+      console.log('Authentication failed:', authHeader);
+      return res.status(401).json({
+        error: 'Unauthorized'
+      });
+    }
     
     const juvonnoServer = new JuvonnoMCPServer();
     const result = await juvonnoServer.getAllLocations();
     
-    return res.json({
-      success: true,
-      message: result
-    });
+    console.log('Returning result:', result.substring(0, 100) + '...');
+    
+    // Return simple text response that Vapi can handle
+    return res.json(result);
   } catch (error) {
     console.error('Get locations error:', error);
     return res.status(500).json({
-      success: false,
       error: error.message
     });
   }
@@ -422,10 +432,20 @@ app.post('/find-location', async (req, res) => {
   try {
     const { postal_code } = req.body;
     console.log(`Function: Find location request for postal code: ${postal_code}`);
+    console.log('Headers:', JSON.stringify(req.headers, null, 2));
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+    
+    // Check authentication
+    const authHeader = req.headers.authorization;
+    if (!authHeader || authHeader !== 'Bearer 9e4ce8c2-e125-4657-bb2b-4ac9c82dc123') {
+      console.log('Authentication failed:', authHeader);
+      return res.status(401).json({
+        error: 'Unauthorized'
+      });
+    }
     
     if (!postal_code) {
       return res.status(400).json({
-        success: false,
         error: 'postal_code is required'
       });
     }
@@ -433,14 +453,13 @@ app.post('/find-location', async (req, res) => {
     const juvonnoServer = new JuvonnoMCPServer();
     const result = await juvonnoServer.findLocationByPostalCode(postal_code);
     
-    return res.json({
-      success: true,
-      message: result
-    });
+    console.log('Returning result:', result.substring(0, 100) + '...');
+    
+    // Return simple text response that Vapi can handle
+    return res.json(result);
   } catch (error) {
     console.error('Find location error:', error);
     return res.status(500).json({
-      success: false,
       error: error.message
     });
   }
