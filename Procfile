@@ -1,1 +1,1 @@
-web: node vapi-server-content-field.js
+web: node vapi-server-with-token.js
