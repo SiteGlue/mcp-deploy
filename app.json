@@ -1,0 +1,38 @@
+{
+  "name": "juvonno-mcp-server-v2",
+  "description": "Advanced Model Context Protocol server for Juvonno API with automatic Swagger tool generation",
+  "repository": "https://github.com/your-username/juvonno-mcp-server",
+  "logo": "https://via.placeholder.com/128x128/007ACC/FFFFFF?text=MCP",
+  "keywords": ["mcp", "juvonno", "api", "healthcare", "appointments", "swagger", "openapi"],
+  "image": "heroku/nodejs",
+  "stack": "heroku-22",
+  "buildpacks": [
+    {
+      "url": "heroku/nodejs"
+    }
+  ],
+  "env": {
+    "NODE_ENV": {
+      "description": "Node.js environment",
+      "value": "production"
+    },
+    "JUVONNO_API_KEY": {
+      "description": "Juvonno API key for authentication",
+      "value": "2deb7d7d8b814409ca3d8b11fd9e9b59a9fd5242"
+    },
+    "JUVONNO_SUBDOMAIN": {
+      "description": "Juvonno subdomain for API calls",
+      "value": "medrehabgroup"
+    }
+  },
+  "formation": {
+    "web": {
+      "quantity": 1,
+      "size": "basic"
+    }
+  },
+  "addons": [],
+  "scripts": {
+    "postdeploy": "echo 'MCP Server deployed successfully'"
+  }
+}
