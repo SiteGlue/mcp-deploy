@@ -418,8 +418,11 @@ app.post('/get-locations', async (req, res) => {
     
     console.log('Returning result:', result.substring(0, 100) + '...');
     
-    // Return simple text response that Vapi can handle
-    return res.json(result);
+    // Return in format Vapi Function tools expect
+    return res.json({
+      result: result,
+      success: true
+    });
   } catch (error) {
     console.error('Get locations error:', error);
     return res.status(500).json({
@@ -455,8 +458,11 @@ app.post('/find-location', async (req, res) => {
     
     console.log('Returning result:', result.substring(0, 100) + '...');
     
-    // Return simple text response that Vapi can handle
-    return res.json(result);
+    // Return in format Vapi Function tools expect
+    return res.json({
+      result: result,
+      success: true
+    });
   } catch (error) {
     console.error('Find location error:', error);
     return res.status(500).json({
