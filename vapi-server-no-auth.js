@@ -8,6 +8,16 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// Log all requests for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
+});
+
 // MedRehab Group location data
 const locations = [
   {
@@ -186,6 +196,27 @@ app.post('/find-location', async (req, res) => {
 // Health check
 app.get('/', (req, res) => {
   res.json({ status: 'MedRehab Group Vapi Server is running' });
+});
+
+// Additional health checks for Function tools
+app.get('/get-locations', (req, res) => {
+  console.log('GET request to /get-locations');
+  res.json({ message: 'Use POST method for this endpoint' });
+});
+
+app.get('/find-location', (req, res) => {
+  console.log('GET request to /find-location');
+  res.json({ message: 'Use POST method for this endpoint' });
+});
+
+// Log all requests for debugging
+app.use((req, res, next) => {
+  console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
+  console.log('Headers:', JSON.stringify(req.headers, null, 2));
+  if (req.body && Object.keys(req.body).length > 0) {
+    console.log('Body:', JSON.stringify(req.body, null, 2));
+  }
+  next();
 });
 
 // Start server
