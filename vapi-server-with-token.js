@@ -257,9 +257,7 @@ app.post('/create-customer', async (req, res) => {
       state, 
       postal_code,
       emergency_contact_name,
-      emergency_contact_phone,
-      subdomain,
-      api_key 
+      emergency_contact_phone
     } = req.body;
     
     console.log('=== CREATE CUSTOMER CALLED ===');
@@ -273,10 +271,14 @@ app.post('/create-customer', async (req, res) => {
       });
     }
     
+    // Use environment variables for Juvonno credentials
+    const subdomain = process.env.JUVONNO_SUBDOMAIN || 'medrehabgroup';
+    const api_key = process.env.JUVONNO_API_KEY || '2deb7d7d8b814409ca3d8b11fd9e9b59a9fd5242';
+    
     if (!subdomain || !api_key) {
       res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
-      return res.status(400).json({
-        error: 'subdomain and api_key are required for Juvonno integration'
+      return res.status(500).json({
+        error: 'Juvonno credentials not configured on server'
       });
     }
     
