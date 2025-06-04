@@ -155,7 +155,7 @@ app.post('/find-location', async (req, res) => {
   try {
     const { postal_code } = req.body;
     console.log('=== FIND LOCATION CALLED ===');
-    console.log(`Postal code: ${postal_code}`);
+    console.log(`Search input: ${postal_code}`);
     console.log('Headers:', JSON.stringify(req.headers, null, 2));
     console.log('Body:', JSON.stringify(req.body, null, 2));
     
@@ -166,24 +166,60 @@ app.post('/find-location', async (req, res) => {
       });
     }
     
-    // Clean postal code for comparison
-    const cleanInput = postal_code.replace(/\s+/g, '').toUpperCase();
+    const searchInput = postal_code.toLowerCase().trim();
+    let nearbyLocations = [];
     
-    // Find nearby locations (simplified logic)
-    const nearbyLocations = locations.filter(loc => {
-      const locCode = loc.postalCode.replace(/\s+/g, '').toUpperCase();
-      // Simple proximity check based on first 3 characters
-      return locCode.substring(0, 3) === cleanInput.substring(0, 3);
-    });
+    // Check if input is a city name
+    if (searchInput.includes('toronto')) {
+      nearbyLocations = locations.filter(loc => 
+        loc.name.toLowerCase().includes('toronto') || 
+        loc.address.toLowerCase().includes('toronto') ||
+        loc.name.toLowerCase().includes('north york')
+      );
+    } else if (searchInput.includes('brampton')) {
+      nearbyLocations = locations.filter(loc => 
+        loc.name.toLowerCase().includes('brampton')
+      );
+    } else if (searchInput.includes('vaughan')) {
+      nearbyLocations = locations.filter(loc => 
+        loc.name.toLowerCase().includes('vaughan') ||
+        loc.name.toLowerCase().includes('woodbridge') ||
+        loc.name.toLowerCase().includes('concord')
+      );
+    } else if (searchInput.includes('hamilton')) {
+      nearbyLocations = locations.filter(loc => 
+        loc.name.toLowerCase().includes('hamilton')
+      );
+    } else if (searchInput.includes('pickering')) {
+      nearbyLocations = locations.filter(loc => 
+        loc.name.toLowerCase().includes('pickering')
+      );
+    } else if (searchInput.includes('georgetown')) {
+      nearbyLocations = locations.filter(loc => 
+        loc.name.toLowerCase().includes('georgetown')
+      );
+    } else if (searchInput.includes('newmarket')) {
+      nearbyLocations = locations.filter(loc => 
+        loc.name.toLowerCase().includes('newmarket')
+      );
+    } else {
+      // Treat as postal code
+      const cleanInput = postal_code.replace(/\s+/g, '').toUpperCase();
+      nearbyLocations = locations.filter(loc => {
+        const locCode = loc.postalCode.replace(/\s+/g, '').toUpperCase();
+        // Simple proximity check based on first 3 characters
+        return locCode.substring(0, 3) === cleanInput.substring(0, 3);
+      });
+    }
     
     let result;
     if (nearbyLocations.length > 0) {
       const locationList = nearbyLocations.map(loc => 
         `${loc.name} - ${loc.address}. Phone: ${loc.phone}. Services: ${loc.services}.`
       ).join('\n\n');
-      result = `Found ${nearbyLocations.length} clinic location(s) near postal code ${postal_code}:\n\n${locationList}`;
+      result = `Found ${nearbyLocations.length} MedRehab Group clinic location(s) for ${postal_code}:\n\n${locationList}`;
     } else {
-      result = `No MedRehab Group clinics found near postal code ${postal_code}. Would you like to see all our locations?`;
+      result = `No MedRehab Group clinics found for ${postal_code}. We have locations in Toronto, Brampton, Vaughan, Hamilton, Pickering, Georgetown, and Newmarket. Would you like to see all our locations?`;
     }
     
     console.log('Returning result (first 100 chars):', result.substring(0, 100) + '...');
@@ -206,9 +242,115 @@ app.post('/find-location', async (req, res) => {
   }
 });
 
+// Create customer endpoint
+app.post('/create-customer', async (req, res) => {
+  try {
+    const { 
+      first_name, 
+      last_name, 
+      email, 
+      phone, 
+      date_of_birth, 
+      gender, 
+      address, 
+      city, 
+      state, 
+      postal_code,
+      emergency_contact_name,
+      emergency_contact_phone,
+      subdomain,
+      api_key 
+    } = req.body;
+    
+    console.log('=== CREATE CUSTOMER CALLED ===');
+    console.log('Customer data:', JSON.stringify(req.body, null, 2));
+    
+    // Validate required fields
+    if (!first_name || !last_name) {
+      res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+      return res.status(400).json({
+        error: 'first_name and last_name are required fields'
+      });
+    }
+    
+    if (!subdomain || !api_key) {
+      res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+      return res.status(400).json({
+        error: 'subdomain and api_key are required for Juvonno integration'
+      });
+    }
+    
+    // Prepare customer payload for Juvonno API
+    const customerPayload = {
+      first_name,
+      last_name,
+      email: email || '',
+      phone: phone || '',
+      date_of_birth: date_of_birth || '',
+      gender: gender || '',
+      address: address || '',
+      city: city || '',
+      state: state || '',
+      postal_code: postal_code || '',
+      emergency_contact_name: emergency_contact_name || '',
+      emergency_contact_phone: emergency_contact_phone || '',
+      is_new_patient: true
+    };
+    
+    // Remove empty string values to avoid API validation issues
+    const cleanPayload = Object.fromEntries(
+      Object.entries(customerPayload).filter(([key, value]) => value !== '')
+    );
+    
+    console.log('Sending to Juvonno API:', cleanPayload);
+    
+    // Create customer in Juvonno using their API
+    const juvonnoResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        'X-API-Key': api_key
+      },
+      body: JSON.stringify(cleanPayload)
+    });
+    
+    if (!juvonnoResponse.ok) {
+      const errorText = await juvonnoResponse.text();
+      console.error('Juvonno API error:', juvonnoResponse.status, errorText);
+      throw new Error(`Juvonno API error: ${juvonnoResponse.status} - ${errorText}`);
+    }
+    
+    const customerData = await juvonnoResponse.json();
+    console.log('Customer created successfully:', customerData);
+    
+    const result = `Successfully created customer: ${first_name} ${last_name}${email ? ` (${email})` : ''}. Customer ID: ${customerData.id || 'Generated'}. The customer has been added to the system and can now book appointments.`;
+    
+    // Set Vapi token header for authentication
+    res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    res.setHeader('Authorization', 'Bearer 00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    
+    // Return in "content" field as expected by system prompt
+    return res.json({
+      content: result,
+      success: true,
+      customer_id: customerData.id,
+      customer_data: customerData
+    });
+    
+  } catch (error) {
+    console.error('Create customer error:', error);
+    res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    return res.status(500).json({
+      error: error.message,
+      content: `Failed to create customer: ${error.message}`
+    });
+  }
+});
+
 // Health check
 app.get('/', (req, res) => {
-  res.json({ status: 'MedRehab Group Vapi Server is running with authentication' });
+  res.json({ status: 'MedRehab Group Vapi Server is running with authentication and customer creation' });
 });
 
 // Additional health checks for Function tools
