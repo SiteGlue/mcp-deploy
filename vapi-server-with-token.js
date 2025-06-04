@@ -288,7 +288,6 @@ app.post('/create-customer', async (req, res) => {
       last_name,
       email: email || '',
       phone: phone || '',
-      date_of_birth: date_of_birth || '',
       gender: gender || '',
       address: address || '',
       city: city || '',
@@ -298,6 +297,24 @@ app.post('/create-customer', async (req, res) => {
       emergency_contact_phone: emergency_contact_phone || '',
       is_new_patient: true
     };
+    
+    // Only add date_of_birth if it's provided and properly formatted
+    if (date_of_birth && date_of_birth.length >= 8) {
+      // Convert various formats to YYYY-MM-DD
+      let formattedDate = date_of_birth;
+      if (date_of_birth.match(/^\d{8}$/)) {
+        // Format: MMDDYYYY -> YYYY-MM-DD
+        const year = date_of_birth.substring(4, 8);
+        const month = date_of_birth.substring(0, 2);
+        const day = date_of_birth.substring(2, 4);
+        formattedDate = `${year}-${month}-${day}`;
+      } else if (date_of_birth.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+        // Format: MM/DD/YYYY -> YYYY-MM-DD
+        const parts = date_of_birth.split('/');
+        formattedDate = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+      }
+      customerPayload.date_of_birth = formattedDate;
+    }
     
     // Remove empty string values to avoid API validation issues
     const cleanPayload = Object.fromEntries(
