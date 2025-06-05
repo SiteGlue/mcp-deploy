@@ -497,7 +497,8 @@ app.post('/book-appointment', async (req, res) => {
     }
     
     const branchesData = await branchesResponse.json();
-    const branch = branchesData.branches?.find(b => 
+    const branches = branchesData.list || branchesData.branches || [];
+    const branch = branches.find(b => 
       b.name.toLowerCase().includes(branch_name.toLowerCase()) ||
       branch_name.toLowerCase().includes(b.name.toLowerCase())
     );
@@ -524,7 +525,8 @@ app.post('/book-appointment', async (req, res) => {
     }
     
     const appointmentTypesData = await appointmentTypesResponse.json();
-    const appointmentType = appointmentTypesData.appointment_types?.find(at => 
+    const appointmentTypes = appointmentTypesData.list || appointmentTypesData.appointment_types || [];
+    const appointmentType = appointmentTypes.find(at => 
       at.name.toLowerCase().includes(service_name.toLowerCase()) ||
       service_name.toLowerCase().includes(at.name.toLowerCase())
     );
@@ -550,7 +552,8 @@ app.post('/book-appointment', async (req, res) => {
       
       if (practitionersResponse.ok) {
         const practitionersData = await practitionersResponse.json();
-        const practitioner = practitionersData.employees?.find(emp => 
+        const employees = practitionersData.list || practitionersData.employees || [];
+        const practitioner = employees.find(emp => 
           `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(practitioner_name.toLowerCase()) ||
           practitioner_name.toLowerCase().includes(`${emp.first_name} ${emp.last_name}`.toLowerCase())
         );
