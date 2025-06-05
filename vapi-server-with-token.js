@@ -573,6 +573,7 @@ app.post('/book-appointment', async (req, res) => {
       schedule_type_id: schedule_type_id,
       date: appointment_date,
       time: appointment_time,
+      duration: 30, // Default 30 minutes for appointments
       start_time: `${appointment_date} ${appointment_time}`,
       notes: `Appointment booked via Voice Assistant. Service: ${service_name}, Category: ${service_category}`,
       attendants: [
