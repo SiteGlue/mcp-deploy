@@ -510,8 +510,9 @@ app.post('/book-appointment', async (req, res) => {
     const branch_id = branch.id;
     console.log('Found branch:', branch_id, branch.name);
     
-    // Step 3: Get appointment types for the service
-    const appointmentTypesResponse = await fetch(`https://${subdomain}.juvonno.com/api/appointment_types?branch_id=${branch_id}`, {
+    // Step 3: Get schedule types for the service
+    const branch_code = branch.code || '';
+    const scheduleTypesResponse = await fetch(`https://${subdomain}.juvonno.com/api/schedule_types/list?branch_code=${branch_code}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -520,23 +521,23 @@ app.post('/book-appointment', async (req, res) => {
       }
     });
     
-    if (!appointmentTypesResponse.ok) {
-      throw new Error('Failed to fetch appointment types');
+    if (!scheduleTypesResponse.ok) {
+      throw new Error('Failed to fetch schedule types');
     }
     
-    const appointmentTypesData = await appointmentTypesResponse.json();
-    const appointmentTypes = appointmentTypesData.list || appointmentTypesData.appointment_types || [];
-    const appointmentType = appointmentTypes.find(at => 
-      at.name.toLowerCase().includes(service_name.toLowerCase()) ||
-      service_name.toLowerCase().includes(at.name.toLowerCase())
+    const scheduleTypesData = await scheduleTypesResponse.json();
+    const scheduleTypes = scheduleTypesData.list || scheduleTypesData.schedule_types || [];
+    const scheduleType = scheduleTypes.find(st => 
+      st.name.toLowerCase().includes(service_name.toLowerCase()) ||
+      service_name.toLowerCase().includes(st.name.toLowerCase())
     );
     
-    if (!appointmentType) {
+    if (!scheduleType) {
       throw new Error(`Service not found: ${service_name}`);
     }
     
-    const appointment_type_id = appointmentType.id;
-    console.log('Found appointment type:', appointment_type_id, appointmentType.name);
+    const schedule_type_id = scheduleType.id;
+    console.log('Found schedule type:', schedule_type_id, scheduleType.name);
     
     // Step 4: Get practitioners (optional)
     let practitioner_id = null;
@@ -569,7 +570,7 @@ app.post('/book-appointment', async (req, res) => {
     const appointmentPayload = {
       customer_id: customer_id,
       branch_id: branch_id,
-      appointment_type_id: appointment_type_id,
+      schedule_type_id: schedule_type_id,
       start_time: `${appointment_date} ${appointment_time}`,
       notes: `Appointment booked via Voice Assistant. Service: ${service_name}, Category: ${service_category}`
     };
