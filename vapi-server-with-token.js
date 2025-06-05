@@ -572,6 +572,7 @@ app.post('/book-appointment', async (req, res) => {
       branch_id: branch_id,
       schedule_type_id: schedule_type_id,
       date: appointment_date,
+      time: appointment_time,
       start_time: `${appointment_date} ${appointment_time}`,
       notes: `Appointment booked via Voice Assistant. Service: ${service_name}, Category: ${service_category}`,
       attendants: [
