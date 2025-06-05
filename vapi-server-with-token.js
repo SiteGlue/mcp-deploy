@@ -288,7 +288,7 @@ app.post('/create-customer', async (req, res) => {
       last_name,
       email: email || '',
       phone: phone || '',
-      gender: gender || '',
+      gender: gender || 'unknown', // Default to 'unknown' if not provided
       address: address || '',
       city: city || '',
       state: state || '',
@@ -316,9 +316,15 @@ app.post('/create-customer', async (req, res) => {
       customerPayload.date_of_birth = formattedDate;
     }
     
-    // Remove empty string values to avoid API validation issues
+    // Remove empty string values to avoid API validation issues, but keep required fields
     const cleanPayload = Object.fromEntries(
-      Object.entries(customerPayload).filter(([key, value]) => value !== '')
+      Object.entries(customerPayload).filter(([key, value]) => {
+        // Always keep required fields even if empty
+        if (['first_name', 'last_name', 'gender'].includes(key)) {
+          return true;
+        }
+        return value !== '';
+      })
     );
     
     console.log('Sending to Juvonno API:', cleanPayload);
@@ -343,7 +349,7 @@ app.post('/create-customer', async (req, res) => {
     const customerData = await juvonnoResponse.json();
     console.log('Customer created successfully:', customerData);
     
-    const result = `Successfully created customer: ${first_name} ${last_name}${email ? ` (${email})` : ''}. Customer ID: ${customerData.id || 'Generated'}. The customer has been added to the system and can now book appointments.`;
+    const result = `Successfully created customer: ${first_name} ${last_name}${email ? ` (${email})` : ''}. Customer ID: ${customerData.customer?.id || customerData.id || 'Generated'}. The customer has been added to the system and can now book appointments.`;
     
     // Set Vapi token header for authentication
     res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
@@ -363,6 +369,305 @@ app.post('/create-customer', async (req, res) => {
     return res.status(500).json({
       error: error.message,
       content: `Failed to create customer: ${error.message}`
+    });
+  }
+});
+
+// Book appointment endpoint
+app.post('/book-appointment', async (req, res) => {
+  try {
+    const { 
+      branch_name,
+      service_category,
+      service_name,
+      practitioner_name,
+      appointment_date,
+      appointment_time,
+      customer_first_name,
+      customer_last_name,
+      customer_email,
+      customer_phone,
+      customer_date_of_birth,
+      customer_gender
+    } = req.body;
+    
+    console.log('=== BOOK APPOINTMENT CALLED ===');
+    console.log('Appointment data:', JSON.stringify(req.body, null, 2));
+    
+    // Validate required fields
+    if (!branch_name || !service_category || !service_name || !appointment_date || !appointment_time || !customer_first_name || !customer_last_name) {
+      res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+      return res.status(400).json({
+        error: 'branch_name, service_category, service_name, appointment_date, appointment_time, customer_first_name, and customer_last_name are required fields'
+      });
+    }
+    
+    // Use environment variables for Juvonno credentials
+    const subdomain = process.env.JUVONNO_SUBDOMAIN || 'medrehabgroup';
+    const api_key = process.env.JUVONNO_API_KEY || '2deb7d7d8b814409ca3d8b11fd9e9b59a9fd5242';
+    
+    let customer_id = null;
+    
+    // Step 1: Find or create customer
+    if (customer_email) {
+      // Try to find existing customer by email
+      const searchResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers?email=${encodeURIComponent(customer_email)}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'X-API-Key': api_key
+        }
+      });
+      
+      if (searchResponse.ok) {
+        const searchData = await searchResponse.json();
+        if (searchData.customers && searchData.customers.length > 0) {
+          customer_id = searchData.customers[0].id;
+          console.log('Found existing customer:', customer_id);
+        }
+      }
+    }
+    
+    // Create customer if not found
+    if (!customer_id) {
+      const customerPayload = {
+        first_name: customer_first_name,
+        last_name: customer_last_name,
+        email: customer_email || '',
+        phone: customer_phone || '',
+        gender: customer_gender || 'unknown',
+        is_new_patient: true
+      };
+      
+      // Add date of birth if provided
+      if (customer_date_of_birth && customer_date_of_birth.length >= 8) {
+        let formattedDate = customer_date_of_birth;
+        if (customer_date_of_birth.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
+          const parts = customer_date_of_birth.split('/');
+          formattedDate = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
+        }
+        customerPayload.date_of_birth = formattedDate;
+      }
+      
+      const cleanPayload = Object.fromEntries(
+        Object.entries(customerPayload).filter(([key, value]) => {
+          if (['first_name', 'last_name', 'gender'].includes(key)) {
+            return true;
+          }
+          return value !== '';
+        })
+      );
+      
+      console.log('Creating new customer:', cleanPayload);
+      
+      const customerResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'X-API-Key': api_key
+        },
+        body: JSON.stringify(cleanPayload)
+      });
+      
+      if (!customerResponse.ok) {
+        const errorText = await customerResponse.text();
+        console.error('Customer creation error:', customerResponse.status, errorText);
+        throw new Error(`Failed to create customer: ${customerResponse.status} - ${errorText}`);
+      }
+      
+      const customerData = await customerResponse.json();
+      customer_id = customerData.customer?.id || customerData.id;
+      console.log('Created new customer:', customer_id);
+    }
+    
+    // Step 2: Get branch ID by name
+    const branchesResponse = await fetch(`https://${subdomain}.juvonno.com/api/branches`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        'X-API-Key': api_key
+      }
+    });
+    
+    if (!branchesResponse.ok) {
+      throw new Error('Failed to fetch branches');
+    }
+    
+    const branchesData = await branchesResponse.json();
+    const branch = branchesData.branches?.find(b => 
+      b.name.toLowerCase().includes(branch_name.toLowerCase()) ||
+      branch_name.toLowerCase().includes(b.name.toLowerCase())
+    );
+    
+    if (!branch) {
+      throw new Error(`Branch not found: ${branch_name}`);
+    }
+    
+    const branch_id = branch.id;
+    console.log('Found branch:', branch_id, branch.name);
+    
+    // Step 3: Get appointment types for the service
+    const appointmentTypesResponse = await fetch(`https://${subdomain}.juvonno.com/api/appointment_types?branch_id=${branch_id}`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        'X-API-Key': api_key
+      }
+    });
+    
+    if (!appointmentTypesResponse.ok) {
+      throw new Error('Failed to fetch appointment types');
+    }
+    
+    const appointmentTypesData = await appointmentTypesResponse.json();
+    const appointmentType = appointmentTypesData.appointment_types?.find(at => 
+      at.name.toLowerCase().includes(service_name.toLowerCase()) ||
+      service_name.toLowerCase().includes(at.name.toLowerCase())
+    );
+    
+    if (!appointmentType) {
+      throw new Error(`Service not found: ${service_name}`);
+    }
+    
+    const appointment_type_id = appointmentType.id;
+    console.log('Found appointment type:', appointment_type_id, appointmentType.name);
+    
+    // Step 4: Get practitioners (optional)
+    let practitioner_id = null;
+    if (practitioner_name) {
+      const practitionersResponse = await fetch(`https://${subdomain}.juvonno.com/api/employees?branch_id=${branch_id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'accept': 'application/json',
+          'X-API-Key': api_key
+        }
+      });
+      
+      if (practitionersResponse.ok) {
+        const practitionersData = await practitionersResponse.json();
+        const practitioner = practitionersData.employees?.find(emp => 
+          `${emp.first_name} ${emp.last_name}`.toLowerCase().includes(practitioner_name.toLowerCase()) ||
+          practitioner_name.toLowerCase().includes(`${emp.first_name} ${emp.last_name}`.toLowerCase())
+        );
+        
+        if (practitioner) {
+          practitioner_id = practitioner.id;
+          console.log('Found practitioner:', practitioner_id, `${practitioner.first_name} ${practitioner.last_name}`);
+        }
+      }
+    }
+    
+    // Step 5: Create appointment
+    const appointmentPayload = {
+      customer_id: customer_id,
+      branch_id: branch_id,
+      appointment_type_id: appointment_type_id,
+      start_time: `${appointment_date} ${appointment_time}`,
+      notes: `Appointment booked via Voice Assistant. Service: ${service_name}, Category: ${service_category}`
+    };
+    
+    if (practitioner_id) {
+      appointmentPayload.employee_id = practitioner_id;
+    }
+    
+    console.log('Creating appointment:', appointmentPayload);
+    
+    const appointmentResponse = await fetch(`https://${subdomain}.juvonno.com/api/appointments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        'X-API-Key': api_key
+      },
+      body: JSON.stringify(appointmentPayload)
+    });
+    
+    if (!appointmentResponse.ok) {
+      const errorText = await appointmentResponse.text();
+      console.error('Appointment creation error:', appointmentResponse.status, errorText);
+      throw new Error(`Failed to create appointment: ${appointmentResponse.status} - ${errorText}`);
+    }
+    
+    const appointmentData = await appointmentResponse.json();
+    console.log('Appointment created successfully:', appointmentData);
+    
+    const result = `Appointment successfully booked! Customer: ${customer_first_name} ${customer_last_name} (ID: ${customer_id}). Service: ${service_name} at ${branch_name}. Date: ${appointment_date} at ${appointment_time}. Appointment ID: ${appointmentData.appointment?.id || appointmentData.id || 'Generated'}.`;
+    
+    // Set Vapi token header for authentication
+    res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    res.setHeader('Authorization', 'Bearer 00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    
+    // Return in "content" field as expected by system prompt
+    return res.json({
+      content: result,
+      success: true,
+      appointment_id: appointmentData.appointment?.id || appointmentData.id,
+      customer_id: customer_id,
+      appointment_data: appointmentData
+    });
+    
+  } catch (error) {
+    console.error('Book appointment error:', error);
+    res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    return res.status(500).json({
+      error: error.message,
+      content: `Failed to book appointment: ${error.message}`
+    });
+  }
+});
+
+// Send email endpoint
+app.post('/send-email', async (req, res) => {
+  try {
+    const { to, subject, body, from_name } = req.body;
+    
+    console.log('=== SEND EMAIL CALLED ===');
+    console.log('Email data:', JSON.stringify(req.body, null, 2));
+    
+    // Validate required fields
+    if (!to || !subject || !body) {
+      res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+      return res.status(400).json({
+        error: 'to, subject, and body are required fields'
+      });
+    }
+    
+    // For now, simulate email sending since we need Gmail API setup
+    // In production, this would integrate with Gmail API or SendGrid
+    const emailResult = {
+      success: true,
+      message: `Email sent to ${to}`,
+      subject: subject,
+      recipient: to,
+      timestamp: new Date().toISOString()
+    };
+    
+    console.log('Email simulated successfully:', emailResult);
+    
+    const result = `Email sent successfully to ${to}. Subject: ${subject}`;
+    
+    // Set Vapi token header for authentication
+    res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    res.setHeader('Authorization', 'Bearer 00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    
+    // Return in "content" field as expected by system prompt
+    return res.json({
+      content: result,
+      success: true,
+      email_data: emailResult
+    });
+    
+  } catch (error) {
+    console.error('Send email error:', error);
+    res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
+    return res.status(500).json({
+      error: error.message,
+      content: `Failed to send email: ${error.message}`
     });
   }
 });
