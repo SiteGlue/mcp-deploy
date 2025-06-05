@@ -572,7 +572,13 @@ app.post('/book-appointment', async (req, res) => {
       branch_id: branch_id,
       schedule_type_id: schedule_type_id,
       start_time: `${appointment_date} ${appointment_time}`,
-      notes: `Appointment booked via Voice Assistant. Service: ${service_name}, Category: ${service_category}`
+      notes: `Appointment booked via Voice Assistant. Service: ${service_name}, Category: ${service_category}`,
+      attendants: [
+        {
+          customer_id: customer_id,
+          attending: true
+        }
+      ]
     };
     
     if (practitioner_id) {
