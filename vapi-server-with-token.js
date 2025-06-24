@@ -436,12 +436,41 @@ app.post('/book-appointment', async (req, res) => {
           console.log('Customer search response:', searchData);
           
           if (searchData.data && searchData.data.length > 0) {
-            // Found existing customer
-            customer_id = searchData.data[0].id;
-            console.log('Found existing customer with new search endpoint:', customer_id);
+            // Found existing customer - extract their details
+            const existingCustomer = searchData.data[0];
+            customer_id = existingCustomer.id;
+            
+            // Use existing customer details if not provided
+            if (!customer_first_name && existingCustomer.first_name) {
+              customer_first_name = existingCustomer.first_name;
+            }
+            if (!customer_last_name && existingCustomer.last_name) {
+              customer_last_name = existingCustomer.last_name;
+            }
+            if (!customer_email && existingCustomer.email) {
+              customer_email = existingCustomer.email;
+            }
+            
+            console.log('Found existing customer with details:', {
+              id: customer_id,
+              name: `${customer_first_name} ${customer_last_name}`,
+              email: customer_email
+            });
           } else if (searchData.customers && searchData.customers.length > 0) {
             // Fallback structure
-            customer_id = searchData.customers[0].id;
+            const existingCustomer = searchData.customers[0];
+            customer_id = existingCustomer.id;
+            
+            if (!customer_first_name && existingCustomer.first_name) {
+              customer_first_name = existingCustomer.first_name;
+            }
+            if (!customer_last_name && existingCustomer.last_name) {
+              customer_last_name = existingCustomer.last_name;
+            }
+            if (!customer_email && existingCustomer.email) {
+              customer_email = existingCustomer.email;
+            }
+            
             console.log('Found existing customer (fallback structure):', customer_id);
           }
         } else {
@@ -474,7 +503,17 @@ app.post('/book-appointment', async (req, res) => {
         if (emailSearchResponse.ok) {
           const emailData = await emailSearchResponse.json();
           if (emailData.data && emailData.data.length > 0) {
-            customer_id = emailData.data[0].id;
+            const existingCustomer = emailData.data[0];
+            customer_id = existingCustomer.id;
+            
+            // Extract customer details
+            if (!customer_first_name && existingCustomer.first_name) {
+              customer_first_name = existingCustomer.first_name;
+            }
+            if (!customer_last_name && existingCustomer.last_name) {
+              customer_last_name = existingCustomer.last_name;
+            }
+            
             console.log('Found existing customer by email:', customer_id);
           }
         } else {
@@ -730,7 +769,51 @@ app.post('/book-appointment', async (req, res) => {
     const appointmentData = await appointmentResponse.json();
     console.log('Appointment created successfully:', appointmentData);
     
-    const result = `Appointment successfully booked! Customer: ${customer_first_name} ${customer_last_name} (ID: ${customer_id}). Service: ${service_name} at ${branch_name}. Date: ${appointment_date} at ${appointment_time}. Appointment ID: ${appointmentData.appointment?.id || appointmentData.id || 'Generated'}.`;
+    const appointmentId = appointmentData.appointment?.id || appointmentData.id || 'Generated';
+    const result = `Appointment successfully booked! Customer: ${customer_first_name} ${customer_last_name} (ID: ${customer_id}). Service: ${service_name} at ${branch_name}. Date: ${appointment_date} at ${appointment_time}. Appointment ID: ${appointmentId}.`;
+    
+    // Send confirmation email if customer email is available
+    if (customer_email && customer_email !== 'string' && customer_email.trim() !== '') {
+      try {
+        const emailBody = `
+Dear ${customer_first_name} ${customer_last_name},
+
+Your appointment has been confirmed!
+
+📅 Date: ${appointment_date}
+🕒 Time: ${appointment_time}
+🏥 Location: ${branch_name}
+💆 Service: ${service_name}
+🆔 Appointment ID: ${appointmentId}
+
+If you need to make any changes or have questions, please contact the clinic directly.
+
+Thank you for choosing MedRehab Group!
+
+Best regards,
+Victoria - AI Patient Coordinator
+MedRehab Group
+        `.trim();
+        
+        const emailResponse = await fetch(`${req.protocol}://${req.get('host')}/send-email`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': req.headers.authorization
+          },
+          body: JSON.stringify({
+            to: customer_email,
+            subject: `Appointment Confirmation - ${service_name} on ${appointment_date}`,
+            body: emailBody,
+            from_name: 'Victoria - MedRehab Group'
+          })
+        });
+        
+        console.log('Email confirmation sent status:', emailResponse.status);
+      } catch (emailError) {
+        console.log('Email sending failed:', emailError.message);
+      }
+    }
     
     // Set Vapi token header for authentication
     res.setHeader('VAPI_TOKEN', '00683124-9b47-4bba-a4a6-ac58c14dc6d9');
