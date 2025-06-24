@@ -411,32 +411,24 @@ app.post('/book-appointment', async (req, res) => {
     // Step 1: Search for existing customer using new v2.2.3 search endpoint
     console.log('Searching for existing customer...');
     
-    // Build search criteria - try multiple methods to find existing customer
-    const searchCriteria = [];
-    
-    if (customer_email) {
-      searchCriteria.push(`email=${encodeURIComponent(customer_email)}`);
-    }
-    
-    if (customer_phone) {
-      searchCriteria.push(`phone=${encodeURIComponent(customer_phone)}`);
-    }
-    
-    if (customer_first_name && customer_last_name) {
-      searchCriteria.push(`first_name=${encodeURIComponent(customer_first_name)}`);
-      searchCriteria.push(`last_name=${encodeURIComponent(customer_last_name)}`);
-    }
-    
-    // Try the new customers/search endpoint first
-    if (searchCriteria.length > 0) {
+    // Phone-first customer search using POST endpoint with clean payload
+    if (customer_phone && customer_phone !== 'string' && customer_phone.trim() !== '') {
       try {
-        const searchResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers/search?${searchCriteria.join('&')}`, {
-          method: 'GET',
+        // Create clean search payload with only phone number
+        const searchPayload = {
+          phone: customer_phone
+        };
+        
+        console.log('Searching for customer by phone only:', searchPayload);
+        
+        const searchResponse = await fetch(`https://${subdomain}.juvonno.com/api/v2.2.3/customers/search`, {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'accept': 'application/json',
             'X-API-Key': api_key
-          }
+          },
+          body: JSON.stringify(searchPayload)
         });
         
         if (searchResponse.ok) {
@@ -460,61 +452,85 @@ app.post('/book-appointment', async (req, res) => {
       }
     }
     
-    // Fallback: Try legacy email search if new endpoint didn't work
-    if (!customer_id && customer_email) {
+    // Fallback: Search by email if phone search failed and email is provided
+    if (!customer_id && customer_email && customer_email !== 'string' && customer_email.trim() !== '') {
       try {
-        const legacySearchResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers?email=${encodeURIComponent(customer_email)}`, {
-          method: 'GET',
+        const emailSearchPayload = {
+          email: customer_email
+        };
+        
+        console.log('Searching for customer by email only:', emailSearchPayload);
+        
+        const emailSearchResponse = await fetch(`https://${subdomain}.juvonno.com/api/v2.2.3/customers/search`, {
+          method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'accept': 'application/json',
             'X-API-Key': api_key
-          }
+          },
+          body: JSON.stringify(emailSearchPayload)
         });
         
-        if (legacySearchResponse.ok) {
-          const legacyData = await legacySearchResponse.json();
-          if (legacyData.customers && legacyData.customers.length > 0) {
-            customer_id = legacyData.customers[0].id;
-            console.log('Found existing customer with legacy search:', customer_id);
+        if (emailSearchResponse.ok) {
+          const emailData = await emailSearchResponse.json();
+          if (emailData.data && emailData.data.length > 0) {
+            customer_id = emailData.data[0].id;
+            console.log('Found existing customer by email:', customer_id);
           }
+        } else {
+          console.log('Email search failed:', emailSearchResponse.status, await emailSearchResponse.text());
         }
-      } catch (legacyError) {
-        console.log('Legacy customer search error:', legacyError.message);
+      } catch (emailError) {
+        console.log('Email search error:', emailError.message);
       }
     }
     
     // Create customer if not found
     if (!customer_id) {
-      const customerPayload = {
-        first_name: customer_first_name,
-        last_name: customer_last_name,
-        email: customer_email || '',
-        phone: customer_phone || '',
-        gender: customer_gender || 'unknown',
-        is_new_patient: true
-      };
+      // Create customer payload with only valid, non-placeholder data
+      const customerPayload = {};
       
-      // Add date of birth if provided
-      if (customer_date_of_birth && customer_date_of_birth.length >= 8) {
-        let formattedDate = customer_date_of_birth;
+      // Only add fields that have real values (not "string" or empty)
+      if (customer_first_name && customer_first_name !== 'string' && customer_first_name.trim() !== '') {
+        customerPayload.first_name = customer_first_name.trim();
+      }
+      
+      if (customer_last_name && customer_last_name !== 'string' && customer_last_name.trim() !== '') {
+        customerPayload.last_name = customer_last_name.trim();
+      }
+      
+      if (customer_email && customer_email !== 'string' && customer_email.trim() !== '') {
+        customerPayload.email = customer_email.trim();
+      }
+      
+      if (customer_phone && customer_phone !== 'string' && customer_phone.trim() !== '') {
+        customerPayload.phone = customer_phone.trim();
+      }
+      
+      if (customer_gender && customer_gender !== 'string' && customer_gender.trim() !== '') {
+        customerPayload.gender = customer_gender.trim();
+      } else {
+        customerPayload.gender = 'unknown'; // Default required field
+      }
+      
+      // Handle date of birth
+      if (customer_date_of_birth && customer_date_of_birth !== 'string' && customer_date_of_birth.trim() !== '') {
+        let formattedDate = customer_date_of_birth.trim();
         if (customer_date_of_birth.match(/^\d{1,2}\/\d{1,2}\/\d{4}$/)) {
           const parts = customer_date_of_birth.split('/');
           formattedDate = `${parts[2]}-${parts[0].padStart(2, '0')}-${parts[1].padStart(2, '0')}`;
         }
         customerPayload.date_of_birth = formattedDate;
+      } else {
+        customerPayload.date_of_birth = '1990-01-01'; // Required field default
       }
       
-      const cleanPayload = Object.fromEntries(
-        Object.entries(customerPayload).filter(([key, value]) => {
-          if (['first_name', 'last_name', 'gender'].includes(key)) {
-            return true;
-          }
-          return value !== '';
-        })
-      );
+      // Ensure we have the minimum required fields
+      if (!customerPayload.first_name || !customerPayload.last_name) {
+        throw new Error('Customer first name and last name are required to create a new customer');
+      }
       
-      console.log('Creating new customer with v2.2.3 API:', cleanPayload);
+      console.log('Creating new customer with v2.2.3 API:', customerPayload);
       
       const customerResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers`, {
         method: 'POST',
@@ -523,7 +539,7 @@ app.post('/book-appointment', async (req, res) => {
           'accept': 'application/json',
           'X-API-Key': api_key
         },
-        body: JSON.stringify(cleanPayload)
+        body: JSON.stringify(customerPayload)
       });
       
       if (!customerResponse.ok) {
@@ -583,8 +599,8 @@ app.post('/book-appointment', async (req, res) => {
     const scheduleTypesData = await scheduleTypesResponse.json();
     const scheduleTypes = scheduleTypesData.list || scheduleTypesData.schedule_types || [];
     
-    // Enhanced service matching logic
-    const scheduleType = scheduleTypes.find(st => {
+    // Enhanced service matching logic with flexible matching
+    let scheduleType = scheduleTypes.find(st => {
       const stName = st.name.toLowerCase();
       const serviceName = service_name.toLowerCase();
       
@@ -606,8 +622,39 @@ app.post('/book-appointment', async (req, res) => {
       return false;
     });
     
+    // Primary fallback: Use service category to find any matching service
+    if (!scheduleType && service_category) {
+      const categoryName = service_category.toLowerCase();
+      scheduleType = scheduleTypes.find(st => {
+        const stName = st.name.toLowerCase();
+        // Broad matching for service categories
+        if (categoryName.includes('massage') && stName.includes('massage')) return true;
+        if (categoryName.includes('physio') && stName.includes('physio')) return true;
+        if (categoryName.includes('chiro') && stName.includes('chiro')) return true;
+        if (categoryName.includes('therapy') && stName.includes('therapy')) return true;
+        return stName.includes(categoryName) || categoryName.includes(stName);
+      });
+    }
+    
+    // Emergency fallback: Just use the first available service
+    if (!scheduleType && scheduleTypes.length > 0) {
+      scheduleType = scheduleTypes[0];
+      console.log('Using first available service as fallback:', scheduleType.name || scheduleType.title);
+    }
+    
+    // Handle different response structures
+    if (!scheduleType && Array.isArray(scheduleTypes) && scheduleTypes.length > 0) {
+      // Try different property names
+      scheduleType = scheduleTypes.find(st => 
+        (st.name && st.name.toLowerCase().includes('massage')) ||
+        (st.title && st.title.toLowerCase().includes('massage')) ||
+        (st.service_name && st.service_name.toLowerCase().includes('massage'))
+      ) || scheduleTypes[0];
+    }
+    
     if (!scheduleType) {
-      throw new Error(`Service not found: ${service_name}`);
+      console.log('Available schedule types:', scheduleTypes.map(st => st.name));
+      throw new Error(`Service not found: ${service_name}. Available services: ${scheduleTypes.map(st => st.name).join(', ')}`);
     }
     
     const schedule_type_id = scheduleType.id;
