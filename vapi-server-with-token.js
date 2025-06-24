@@ -582,10 +582,29 @@ app.post('/book-appointment', async (req, res) => {
     
     const scheduleTypesData = await scheduleTypesResponse.json();
     const scheduleTypes = scheduleTypesData.list || scheduleTypesData.schedule_types || [];
-    const scheduleType = scheduleTypes.find(st => 
-      st.name.toLowerCase().includes(service_name.toLowerCase()) ||
-      service_name.toLowerCase().includes(st.name.toLowerCase())
-    );
+    
+    // Enhanced service matching logic
+    const scheduleType = scheduleTypes.find(st => {
+      const stName = st.name.toLowerCase();
+      const serviceName = service_name.toLowerCase();
+      
+      // Direct match
+      if (stName === serviceName) return true;
+      
+      // Partial match
+      if (stName.includes(serviceName) || serviceName.includes(stName)) return true;
+      
+      // Handle common variations
+      if (serviceName.includes('massage') && stName.includes('massage')) return true;
+      if (serviceName.includes('physio') && stName.includes('physio')) return true;
+      if (serviceName.includes('chiro') && stName.includes('chiro')) return true;
+      
+      // Handle duration specifications (30 minute, 60 minute, etc.)
+      if (serviceName.includes('30') && stName.includes('massage')) return true;
+      if (serviceName.includes('60') && stName.includes('massage')) return true;
+      
+      return false;
+    });
     
     if (!scheduleType) {
       throw new Error(`Service not found: ${service_name}`);
