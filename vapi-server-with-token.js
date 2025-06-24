@@ -408,24 +408,79 @@ app.post('/book-appointment', async (req, res) => {
     
     let customer_id = null;
     
-    // Step 1: Find or create customer
+    // Step 1: Search for existing customer using new v2.2.3 search endpoint
+    console.log('Searching for existing customer...');
+    
+    // Build search criteria - try multiple methods to find existing customer
+    const searchCriteria = [];
+    
     if (customer_email) {
-      // Try to find existing customer by email
-      const searchResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers?email=${encodeURIComponent(customer_email)}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'accept': 'application/json',
-          'X-API-Key': api_key
+      searchCriteria.push(`email=${encodeURIComponent(customer_email)}`);
+    }
+    
+    if (customer_phone) {
+      searchCriteria.push(`phone=${encodeURIComponent(customer_phone)}`);
+    }
+    
+    if (customer_first_name && customer_last_name) {
+      searchCriteria.push(`first_name=${encodeURIComponent(customer_first_name)}`);
+      searchCriteria.push(`last_name=${encodeURIComponent(customer_last_name)}`);
+    }
+    
+    // Try the new customers/search endpoint first
+    if (searchCriteria.length > 0) {
+      try {
+        const searchResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers/search?${searchCriteria.join('&')}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'accept': 'application/json',
+            'X-API-Key': api_key
+          }
+        });
+        
+        if (searchResponse.ok) {
+          const searchData = await searchResponse.json();
+          console.log('Customer search response:', searchData);
+          
+          if (searchData.data && searchData.data.length > 0) {
+            // Found existing customer
+            customer_id = searchData.data[0].id;
+            console.log('Found existing customer with new search endpoint:', customer_id);
+          } else if (searchData.customers && searchData.customers.length > 0) {
+            // Fallback structure
+            customer_id = searchData.customers[0].id;
+            console.log('Found existing customer (fallback structure):', customer_id);
+          }
+        } else {
+          console.log('Customer search failed:', searchResponse.status, await searchResponse.text());
         }
-      });
-      
-      if (searchResponse.ok) {
-        const searchData = await searchResponse.json();
-        if (searchData.customers && searchData.customers.length > 0) {
-          customer_id = searchData.customers[0].id;
-          console.log('Found existing customer:', customer_id);
+      } catch (searchError) {
+        console.log('Customer search error:', searchError.message);
+      }
+    }
+    
+    // Fallback: Try legacy email search if new endpoint didn't work
+    if (!customer_id && customer_email) {
+      try {
+        const legacySearchResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers?email=${encodeURIComponent(customer_email)}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'accept': 'application/json',
+            'X-API-Key': api_key
+          }
+        });
+        
+        if (legacySearchResponse.ok) {
+          const legacyData = await legacySearchResponse.json();
+          if (legacyData.customers && legacyData.customers.length > 0) {
+            customer_id = legacyData.customers[0].id;
+            console.log('Found existing customer with legacy search:', customer_id);
+          }
         }
+      } catch (legacyError) {
+        console.log('Legacy customer search error:', legacyError.message);
       }
     }
     
@@ -459,7 +514,7 @@ app.post('/book-appointment', async (req, res) => {
         })
       );
       
-      console.log('Creating new customer:', cleanPayload);
+      console.log('Creating new customer with v2.2.3 API:', cleanPayload);
       
       const customerResponse = await fetch(`https://${subdomain}.juvonno.com/api/customers`, {
         method: 'POST',
